@@ -1,0 +1,6 @@
+symbol,price,previous_close,relative_volume,has_news,float_millions,volume,gap_percent,change_percent,target_potential_percent,setup,entry_price,stop_price
+ABCD,4.20,3.15,8.4,yes,7.8,12500000,,33.3,24,pullback over VWAP,4.25,4.05
+WIDE,18.75,18.10,6.2,yes,42.0,8200000,,3.6,8,pullback,18.80,18.20
+QUIK,0.82,0.55,12.1,yes,4.0,22000000,,49.1,35,momentum pullback,0.84,0.77
+NOCAT,9.35,7.95,9.0,no,11.2,6100000,,17.6,22,pullback,9.40,9.05
+TINY,2.65,2.00,5.8,yes,13.3,9100000,,32.5,21,pullback near high of day,2.68,2.52

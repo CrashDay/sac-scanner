@@ -1,0 +1,8 @@
+[project]
+name = "sac-scanner"
+version = "0.1.0"
+description = "Small account day-trade scanner based on SAC strategy principles."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

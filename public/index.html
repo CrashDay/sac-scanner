@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SAC Live Scanner</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Schwab live data</p>
+        <h1>SAC Live Scanner</h1>
+      </div>
+      <div class="status">
+        <span id="feedDot" class="dot idle"></span>
+        <span id="feedText">Waiting</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="controls" aria-label="Risk controls">
+        <label>Account <input id="accountSize" type="number" value="1000" min="1" step="50" /></label>
+        <label>Risk <input id="riskPerTrade" type="number" value="50" min="1" step="5" /></label>
+        <label>Reward <input id="rewardTarget" type="number" value="100" min="1" step="5" /></label>
+        <label>Daily stop <input id="dailyMaxLoss" type="number" value="100" min="1" step="5" /></label>
+        <button id="refreshButton" type="button">Refresh</button>
+      </section>
+
+      <section class="summary" aria-label="Scanner summary">
+        <div>
+          <span id="aCount">0</span>
+          <label>A quality</label>
+        </div>
+        <div>
+          <span id="watchCount">0</span>
+          <label>Watch</label>
+        </div>
+        <div>
+          <span id="rejectCount">0</span>
+          <label>Reject</label>
+        </div>
+        <div>
+          <span id="updatedAt">--</span>
+          <label>Updated</label>
+        </div>
+      </section>
+
+      <section class="tableShell" aria-label="Dynamic scanner list">
+        <table>
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Grade</th>
+              <th>Score</th>
+              <th>Price</th>
+              <th>Change</th>
+              <th>Rel Vol</th>
+              <th>Float</th>
+              <th>Shares</th>
+              <th>Why</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody">
+            <tr><td colspan="9" class="empty">Loading live scanner...</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
