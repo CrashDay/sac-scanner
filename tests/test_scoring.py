@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timezone
 
 from sac_scanner.live import build_live_scan
 from sac_scanner.models import Candidate, RiskPlan
@@ -57,6 +58,7 @@ class ScoringTest(unittest.TestCase):
                 previous_close=2.00,
                 relative_volume=5.8,
                 has_news=True,
+                news_age_days=0.2,
                 float_millions=13.3,
                 target_potential_percent=21,
                 setup="pullback near high of day",
@@ -71,7 +73,7 @@ class ScoringTest(unittest.TestCase):
         self.assertEqual(result.max_shares_by_risk, 312)
         self.assertFalse(result.fail_reasons)
 
-    def test_missing_news_prevents_a_quality_grade(self):
+    def test_missing_news_only_reduces_conviction(self):
         result = evaluate(
             Candidate(
                 symbol="NOCAT",
@@ -85,8 +87,27 @@ class ScoringTest(unittest.TestCase):
             RiskPlan(),
         )
 
-        self.assertNotEqual(result.grade, "A")
-        self.assertIn("no news catalyst", result.fail_reasons)
+        self.assertEqual(result.grade, "B")
+        self.assertIn("no fresh catalyst", result.warnings)
+        self.assertNotIn("no news catalyst", result.fail_reasons)
+
+    def test_stale_news_is_not_treated_as_a_live_catalyst(self):
+        result = evaluate(
+            Candidate(
+                symbol="STALE",
+                price=8.4,
+                previous_close=7.1,
+                relative_volume=7.4,
+                has_news=False,
+                news_age_days=6.0,
+                float_millions=9.2,
+                target_potential_percent=24,
+            ),
+            RiskPlan(),
+        )
+
+        self.assertEqual(result.grade, "B")
+        self.assertIn("catalyst is stale at 6.0 day(s) old", result.warnings)
 
     def test_price_below_one_dollar_is_rejected(self):
         result = evaluate(
@@ -127,6 +148,8 @@ class ScoringTest(unittest.TestCase):
                 {
                     "TINY": {
                         "has_news": True,
+                        "news_timestamp": datetime.now(timezone.utc).isoformat(),
+                        "news_headline": "Fresh catalyst",
                         "float_millions": 13.3,
                         "target_potential_percent": 21,
                         "setup": "pullback",
@@ -142,6 +165,44 @@ class ScoringTest(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["results"][0]["symbol"], "TINY")
         self.assertEqual(payload["results"][0]["grade"], "A")
+
+    def test_live_scan_filters_symbols_outside_display_price_guardrails(self):
+        class MultiPriceClient(FakeSchwabClient):
+            def get_quotes(self, symbols):
+                return {
+                    "CHEAP": {"realtime": True, "quote": {"lastPrice": 0.5, "closePrice": 0.4, "netPercentChange": 25, "totalVolume": 5800000}},
+                    "OKAY": {"realtime": True, "quote": {"lastPrice": 2.65, "closePrice": 2.0, "netPercentChange": 32.5, "totalVolume": 5800000}},
+                    "RICH": {"realtime": True, "quote": {"lastPrice": 30.0, "closePrice": 28.0, "netPercentChange": 7.1, "totalVolume": 5800000}},
+                }
+
+        payload = build_live_scan(
+            watchlist_path=PathFixture("CHEAP\nOKAY\nRICH"),
+            annotations_path=JsonFixture({"OKAY": {"float_millions": 13.3}}),
+            risk=RiskPlan(),
+            client=MultiPriceClient(),
+        )
+
+        self.assertEqual([item["symbol"] for item in payload["results"]], ["OKAY"])
+
+    def test_live_scan_hides_stale_headlines(self):
+        payload = build_live_scan(
+            watchlist_path=PathFixture("TINY"),
+            annotations_path=JsonFixture(
+                {
+                    "TINY": {
+                        "has_news": True,
+                        "news_headline": "Old catalyst",
+                        "news_timestamp": "2026-07-01T18:21:08-04:00",
+                        "float_millions": 13.3,
+                    }
+                }
+            ),
+            risk=RiskPlan(),
+            client=FakeSchwabClient(),
+        )
+
+        self.assertEqual(payload["results"][0]["news_headline"], "")
+        self.assertFalse(payload["results"][0]["has_news"])
 
 
 if __name__ == "__main__":

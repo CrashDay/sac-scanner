@@ -14,6 +14,7 @@ class Candidate:
     relative_volume: float
     has_news: bool
     float_millions: float
+    news_age_days: float | None = None
     volume: int | None = None
     gap_percent: float | None = None
     change_percent: float | None = None

@@ -20,10 +20,10 @@
 
     <main>
       <section class="controls" aria-label="Risk controls">
-        <label>Account <input id="accountSize" type="number" value="1000" min="1" step="50" /></label>
-        <label>Risk <input id="riskPerTrade" type="number" value="50" min="1" step="5" /></label>
-        <label>Reward <input id="rewardTarget" type="number" value="100" min="1" step="5" /></label>
-        <label>Daily stop <input id="dailyMaxLoss" type="number" value="100" min="1" step="5" /></label>
+        <label>Account <input id="accountSize" type="number" value="10000" min="1" step="50" /></label>
+        <label>Risk <input id="riskPerTrade" type="number" value="150" min="1" step="5" /></label>
+        <label>Reward <input id="rewardTarget" type="number" value="300" min="1" step="5" /></label>
+        <label>Daily stop <input id="dailyMaxLoss" type="number" value="500" min="1" step="5" /></label>
         <button id="refreshButton" type="button">Refresh</button>
       </section>
 
@@ -44,6 +44,22 @@
           <span id="updatedAt">--</span>
           <label>Updated</label>
         </div>
+        <div>
+          <span id="dayPnl">$0.00</span>
+          <label>SAC P/L</label>
+        </div>
+        <div>
+          <span id="dayTrades">0</span>
+          <label>SAC trades</label>
+        </div>
+      </section>
+
+      <section class="positions" aria-label="SAC day-trader positions">
+        <div class="positionsHeader">
+          <h2>SAC Day Trader</h2>
+          <span id="dayLock" class="lockBadge">Manual gate</span>
+        </div>
+        <div id="positionsBody" class="positionsBody">No open SAC day trade.</div>
       </section>
 
       <section class="tableShell" aria-label="Dynamic scanner list">
@@ -58,11 +74,12 @@
               <th>Rel Vol</th>
               <th>Float</th>
               <th>Shares</th>
+              <th>Gate</th>
               <th>Why</th>
             </tr>
           </thead>
           <tbody id="resultsBody">
-            <tr><td colspan="9" class="empty">Loading live scanner...</td></tr>
+            <tr><td colspan="10" class="empty">Loading live scanner...</td></tr>
           </tbody>
         </table>
       </section>

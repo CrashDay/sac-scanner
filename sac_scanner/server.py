@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from .day_trader import DayTraderConfig, approve_entry, close_position, status as day_trader_status
 from .live import build_live_scan
 from .models import RiskPlan
 from .schwab import SchwabError
@@ -35,6 +36,9 @@ class ScannerHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/scan":
             self.handle_scan(parsed.query)
             return
+        if parsed.path == "/api/day-trader/status":
+            self.send_json(day_trader_status(config=day_trader_config_from_query(parsed.query)))
+            return
         if parsed.path == "/api/config":
             self.send_json({"ok": True, "watchlist_path": "config/watchlist.txt", "annotations_path": "config/annotations.json"})
             return
@@ -49,13 +53,33 @@ class ScannerHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(file_path.read_bytes())
 
+    def do_POST(self) -> None:
+        parsed = urlparse(self.path)
+        payload = self.read_json_body()
+        if parsed.path == "/api/day-trader/approve-entry":
+            result = approve_entry(
+                payload.get("candidate", {}),
+                config=day_trader_config_from_payload(payload),
+            )
+            self.send_json(result, status=HTTPStatus.OK if result.get("ok") else HTTPStatus.BAD_REQUEST)
+            return
+        if parsed.path == "/api/day-trader/close-position":
+            result = close_position(
+                str(payload.get("position_id") or ""),
+                float_value(payload.get("exit_price"), 0),
+                config=day_trader_config_from_payload(payload),
+            )
+            self.send_json(result, status=HTTPStatus.OK if result.get("ok") else HTTPStatus.BAD_REQUEST)
+            return
+        self.send_error(HTTPStatus.NOT_FOUND)
+
     def handle_scan(self, query: str) -> None:
         params = parse_qs(query)
         risk = RiskPlan(
-            account_size=float_param(params, "account_size", 1000),
-            risk_per_trade=float_param(params, "risk_per_trade", 50),
-            reward_target=float_param(params, "reward_target", 100),
-            daily_max_loss=float_param(params, "daily_max_loss", 100),
+            account_size=float_param(params, "account_size", 10_000),
+            risk_per_trade=float_param(params, "risk_per_trade", 150),
+            reward_target=float_param(params, "reward_target", 300),
+            daily_max_loss=float_param(params, "daily_max_loss", 500),
             max_consecutive_losers=int(float_param(params, "max_consecutive_losers", 3)),
         )
         try:
@@ -73,6 +97,15 @@ class ScannerHandler(BaseHTTPRequestHandler):
             return
         self.send_json(payload)
 
+    def read_json_body(self) -> dict:
+        length = int(self.headers.get("Content-Length") or 0)
+        if length <= 0:
+            return {}
+        try:
+            return json.loads(self.rfile.read(length).decode("utf-8"))
+        except json.JSONDecodeError:
+            return {}
+
     def send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:
         body = json.dumps(payload, indent=2).encode("utf-8")
         self.send_response(status)
@@ -89,6 +122,33 @@ class ScannerHandler(BaseHTTPRequestHandler):
 def float_param(params: dict[str, list[str]], key: str, default: float) -> float:
     try:
         return float(params.get(key, [default])[0])
+    except (TypeError, ValueError):
+        return default
+
+
+def day_trader_config_from_query(query: str) -> DayTraderConfig:
+    params = parse_qs(query)
+    return DayTraderConfig(
+        account_size=float_param(params, "account_size", 10_000),
+        risk_per_trade=float_param(params, "risk_per_trade", 150),
+        reward_target=float_param(params, "reward_target", 300),
+        daily_max_loss=float_param(params, "daily_max_loss", 500),
+    )
+
+
+def day_trader_config_from_payload(payload: dict) -> DayTraderConfig:
+    risk = payload.get("risk") if isinstance(payload.get("risk"), dict) else {}
+    return DayTraderConfig(
+        account_size=float_value(risk.get("account_size"), 10_000),
+        risk_per_trade=float_value(risk.get("risk_per_trade"), 150),
+        reward_target=float_value(risk.get("reward_target"), 300),
+        daily_max_loss=float_value(risk.get("daily_max_loss"), 500),
+    )
+
+
+def float_value(value: object, default: float) -> float:
+    try:
+        return float(value)
     except (TypeError, ValueError):
         return default
 

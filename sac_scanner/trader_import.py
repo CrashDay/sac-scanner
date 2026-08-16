@@ -17,6 +17,7 @@ def import_trader_watchlist(
 ) -> dict[str, Any]:
     payload = json.loads(source_path.read_text(encoding="utf-8"))
     candidates = payload.get("candidates") if isinstance(payload, dict) else []
+    generated_at = str(payload.get("generated_at") or "") if isinstance(payload, dict) else ""
     if not isinstance(candidates, list):
         candidates = []
 
@@ -32,6 +33,7 @@ def import_trader_watchlist(
         annotations[symbol] = {
             "has_news": bool(item.get("catalyst")),
             "news_headline": str(item.get("catalyst") or "")[:280],
+            "news_timestamp": generated_at if item.get("catalyst") else "",
             "float_millions": item.get("float_millions", ""),
             "target_potential_percent": item.get("target_potential_percent", ""),
             "setup": item.get("setup_type") or "pullback candidate",
@@ -43,8 +45,11 @@ def import_trader_watchlist(
 
     watchlist_path.parent.mkdir(parents=True, exist_ok=True)
     annotations_path.parent.mkdir(parents=True, exist_ok=True)
-    watchlist_path.write_text("\n".join(symbols) + "\n", encoding="utf-8")
-    annotations_path.write_text(json.dumps(annotations, indent=2) + "\n", encoding="utf-8")
+    watchlist_path.write_text("
+".join(symbols) + "
+", encoding="utf-8")
+    annotations_path.write_text(json.dumps(annotations, indent=2) + "
+", encoding="utf-8")
 
     return {
         "source": str(source_path),

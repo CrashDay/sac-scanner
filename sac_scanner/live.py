@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +12,9 @@ from .schwab import SchwabConfig, SchwabMarketDataClient
 
 DEFAULT_WATCHLIST_PATH = Path("config/watchlist.txt")
 DEFAULT_ANNOTATIONS_PATH = Path("config/annotations.json")
+RECENT_NEWS_WINDOW = timedelta(days=3)
+DISPLAY_PRICE_MIN = 0.75
+DISPLAY_PRICE_MAX = 25.0
 
 
 def load_watchlist(path: Path = DEFAULT_WATCHLIST_PATH) -> list[str]:
@@ -28,7 +31,11 @@ def load_annotations(path: Path = DEFAULT_ANNOTATIONS_PATH) -> dict[str, dict[st
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    return {str(symbol).upper(): value for symbol, value in data.items() if isinstance(value, dict)}
+    return {
+        str(symbol).upper(): normalize_annotation(value)
+        for symbol, value in data.items()
+        if isinstance(value, dict)
+    }
 
 
 def build_live_scan(
@@ -51,6 +58,8 @@ def build_live_scan(
         quote = quote_payload.get("quote") if isinstance(quote_payload.get("quote"), dict) else quote_payload
         annotation = annotations.get(symbol, {})
         candidate = candidate_from_schwab(symbol, quote, histories.get(symbol, {}), annotation)
+        if candidate.price < DISPLAY_PRICE_MIN or candidate.price > DISPLAY_PRICE_MAX:
+            continue
         result = evaluate(candidate, risk)
         results.append(result_to_dict(result, annotation, quote_payload))
 
@@ -98,6 +107,7 @@ def candidate_from_schwab(
         relative_volume=relative_volume,
         has_news=bool(annotation.get("has_news", False)),
         float_millions=float(annotation.get("float_millions") or 999999),
+        news_age_days=number_or_none(annotation.get("news_age_days")),
         volume=int(total_volume) if total_volume else None,
         gap_percent=number_or_none(annotation.get("gap_percent")),
         change_percent=number_or_none(quote.get("netPercentChange")) or number_or_none(quote.get("markPercentChange")),
@@ -133,6 +143,36 @@ def result_to_dict(result, annotation: dict[str, Any], raw_quote: dict[str, Any]
     }
 
 
+def normalize_annotation(annotation: dict[str, Any], now: datetime | None = None) -> dict[str, Any]:
+    normalized = dict(annotation)
+    now = now or datetime.now(timezone.utc)
+    news_timestamp = parse_timestamp(annotation.get("news_timestamp"))
+    headline = str(annotation.get("news_headline") or "").strip()
+
+    if not headline:
+        normalized["has_news"] = False
+        normalized["news_headline"] = ""
+        normalized["news_age_days"] = None
+        return normalized
+
+    if news_timestamp is None:
+        normalized["has_news"] = False
+        normalized["news_headline"] = ""
+        normalized["news_age_days"] = None
+        return normalized
+
+    age = now - news_timestamp
+    age_days = max(age.total_seconds(), 0) / 86400
+    normalized["news_age_days"] = age_days
+    if age <= RECENT_NEWS_WINDOW:
+        normalized["has_news"] = True
+        normalized["news_headline"] = headline
+    else:
+        normalized["has_news"] = False
+        normalized["news_headline"] = ""
+    return normalized
+
+
 def safe_history(client: SchwabMarketDataClient, symbol: str) -> dict[str, Any]:
     try:
         return client.get_price_history(symbol)
@@ -154,6 +194,18 @@ def number_or_none(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return parsed if parsed == parsed else None
+
+
+def parse_timestamp(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def average_daily_volume(history: dict[str, Any], lookback: int = 20) -> float | None:

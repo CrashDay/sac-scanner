@@ -9,6 +9,7 @@ REL_VOLUME_MIN = 5.0
 FLOAT_MAX_MILLIONS = 20.0
 STRONG_CHANGE_PERCENT = 10.0
 IDEAL_POTENTIAL_PERCENT = 20.0
+RECENT_NEWS_MAX_AGE_DAYS = 3.0
 
 
 def evaluate(candidate: Candidate, risk: RiskPlan) -> ScanResult:
@@ -40,10 +41,15 @@ def evaluate(candidate: Candidate, risk: RiskPlan) -> ScanResult:
         fail_reasons.append(f"relative volume is below {REL_VOLUME_MIN:.1f}x")
 
     if candidate.has_news:
-        score += 15
-        pass_reasons.append("has a news catalyst")
+        score += 12
+        if candidate.news_age_days is not None:
+            pass_reasons.append(f"has a recent catalyst from {candidate.news_age_days:.1f} day(s) ago")
+        else:
+            pass_reasons.append("has a recent catalyst")
+    elif candidate.news_age_days is not None and candidate.news_age_days > RECENT_NEWS_MAX_AGE_DAYS:
+        warnings.append(f"catalyst is stale at {candidate.news_age_days:.1f} day(s) old")
     else:
-        fail_reasons.append("no news catalyst")
+        warnings.append("no fresh catalyst")
 
     if candidate.float_millions <= FLOAT_MAX_MILLIONS:
         score += 15
@@ -74,7 +80,6 @@ def evaluate(candidate: Candidate, risk: RiskPlan) -> ScanResult:
         PRICE_MIN <= candidate.price <= PRICE_MAX
         and change > 0
         and candidate.relative_volume >= REL_VOLUME_MIN
-        and candidate.has_news
         and candidate.float_millions <= FLOAT_MAX_MILLIONS
     )
 
