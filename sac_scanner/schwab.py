@@ -80,6 +80,12 @@ class SchwabMarketDataClient:
             {"symbols": ",".join(symbols)},
         )
 
+    def get_movers(self, symbol_id: str, *, sort: str = "PERCENT_CHANGE_UP", frequency: int = 0) -> dict[str, Any]:
+        return self._request_json(
+            f"/marketdata/v1/movers/{symbol_id}",
+            {"sort": sort, "frequency": frequency},
+        )
+
     def get_price_history(
         self,
         symbol: str,

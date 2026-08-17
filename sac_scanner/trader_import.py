@@ -45,11 +45,8 @@ def import_trader_watchlist(
 
     watchlist_path.parent.mkdir(parents=True, exist_ok=True)
     annotations_path.parent.mkdir(parents=True, exist_ok=True)
-    watchlist_path.write_text("
-".join(symbols) + "
-", encoding="utf-8")
-    annotations_path.write_text(json.dumps(annotations, indent=2) + "
-", encoding="utf-8")
+    watchlist_path.write_text("\n".join(symbols) + "\n", encoding="utf-8")
+    annotations_path.write_text(json.dumps(annotations, indent=2) + "\n", encoding="utf-8")
 
     return {
         "source": str(source_path),

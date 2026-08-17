@@ -71,7 +71,7 @@ function render(payload, dayStatus) {
   renderDayStatus(dayStatus);
 
   if (!results.length) {
-    body.innerHTML = `<tr><td colspan="10" class="empty">No symbols in the watchlist.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="10" class="empty">No live or cached SAC candidates currently match the scanner.</td></tr>`;
     return;
   }
 
@@ -83,7 +83,7 @@ function render(payload, dayStatus) {
       <td>${money(item.price)}</td>
       <td>${number(item.change_percent)}%</td>
       <td>${number(item.relative_volume)}x</td>
-      <td>${number(item.float_millions)}M</td>
+      <td>${floatText(item)}</td>
       <td>${shareText(item)}</td>
       <td>${gateButton(item, index, dayStatus)}</td>
       <td class="why">${whyText(item)}</td>
@@ -190,6 +190,12 @@ function shareText(item) {
   const shares = item.max_shares_by_risk || item.max_shares_by_cash || 0;
   const target = item.target_profit_price ? `<br />Target ${money(item.target_profit_price)}` : "";
   return `${shares}${target}`;
+}
+
+function floatText(item) {
+  if (item.float_source === "unknown") return "Unknown";
+  const suffix = item.float_source === "schwab_shares_outstanding" ? "M est." : "M";
+  return `${number(item.float_millions)}${suffix}`;
 }
 
 function setStatus(kind, text) {

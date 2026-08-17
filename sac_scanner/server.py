@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -15,6 +16,8 @@ from .schwab import SchwabError
 
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_DIR = ROOT / "public"
+SCAN_CACHE_TTL = timedelta(minutes=3)
+SCAN_CACHE: dict[tuple[float, float, float, float, int], tuple[datetime, dict]] = {}
 
 
 class ScannerHandler(BaseHTTPRequestHandler):
@@ -40,7 +43,15 @@ class ScannerHandler(BaseHTTPRequestHandler):
             self.send_json(day_trader_status(config=day_trader_config_from_query(parsed.query)))
             return
         if parsed.path == "/api/config":
-            self.send_json({"ok": True, "watchlist_path": "config/watchlist.txt", "annotations_path": "config/annotations.json"})
+            self.send_json(
+                {
+                    "ok": True,
+                    "source": "schwab_universe_active_cached_watchlist_closed",
+                    "universe_path": "data/universe/equities.json",
+                    "cache_path": "config/watchlist.txt",
+                    "scan_cache_ttl_seconds": int(SCAN_CACHE_TTL.total_seconds()),
+                }
+            )
             return
 
         rel_path = "index.html" if parsed.path in {"", "/"} else parsed.path.lstrip("/")
@@ -82,6 +93,12 @@ class ScannerHandler(BaseHTTPRequestHandler):
             daily_max_loss=float_param(params, "daily_max_loss", 500),
             max_consecutive_losers=int(float_param(params, "max_consecutive_losers", 3)),
         )
+        cache_key = risk_cache_key(risk)
+        cached = SCAN_CACHE.get(cache_key)
+        now = datetime.now(timezone.utc)
+        if cached and now - cached[0] <= SCAN_CACHE_TTL:
+            self.send_json({**cached[1], "cached": True})
+            return
         try:
             payload = build_live_scan(risk=risk)
         except (OSError, SchwabError, ValueError) as exc:
@@ -95,6 +112,7 @@ class ScannerHandler(BaseHTTPRequestHandler):
                 status=HTTPStatus.BAD_GATEWAY,
             )
             return
+        SCAN_CACHE[cache_key] = (now, payload)
         self.send_json(payload)
 
     def read_json_body(self) -> dict:
@@ -124,6 +142,16 @@ def float_param(params: dict[str, list[str]], key: str, default: float) -> float
         return float(params.get(key, [default])[0])
     except (TypeError, ValueError):
         return default
+
+
+def risk_cache_key(risk: RiskPlan) -> tuple[float, float, float, float, int]:
+    return (
+        risk.account_size,
+        risk.risk_per_trade,
+        risk.reward_target,
+        risk.daily_max_loss,
+        risk.max_consecutive_losers,
+    )
 
 
 def day_trader_config_from_query(query: str) -> DayTraderConfig:

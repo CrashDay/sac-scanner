@@ -9,6 +9,7 @@ from typing import Any
 from .models import Candidate, RiskPlan, parse_bool
 from .scoring import evaluate, grade_rank
 from .trader_import import DEFAULT_TRADER_WATCHLIST, import_trader_watchlist
+from .universe import DEFAULT_UNIVERSE_PATH, refresh_universe
 
 
 GRADE_ORDER = {"A": 0, "B": 1, "C": 2, "Reject": 3}
@@ -127,6 +128,12 @@ def import_watchlist(args: argparse.Namespace) -> int:
     return 0
 
 
+def refresh_equity_universe(args: argparse.Namespace) -> int:
+    payload = refresh_universe(args.output)
+    print(f"Saved {payload['count']} symbols to {args.output}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sac-scanner",
@@ -153,6 +160,13 @@ def build_parser() -> argparse.ArgumentParser:
     import_parser.add_argument("--annotations", type=Path, default=Path("config/annotations.json"))
     import_parser.add_argument("--limit", type=int, default=30)
     import_parser.set_defaults(func=import_watchlist)
+
+    universe_parser = subparsers.add_parser(
+        "refresh-universe",
+        help="refresh the portable listed-equity universe from Nasdaq Trader",
+    )
+    universe_parser.add_argument("--output", type=Path, default=DEFAULT_UNIVERSE_PATH)
+    universe_parser.set_defaults(func=refresh_equity_universe)
 
     return parser
 

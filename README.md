@@ -48,7 +48,8 @@ http://127.0.0.1:8765
 ```
 
 On macOS, you can also double-click `scripts/start-sac-scanner.command` from
-Finder to start the local dashboard.
+Finder to start the local dashboard. On Windows, run the same Python module from
+PowerShell or Command Prompt.
 
 By default it reads Schwab settings from:
 
@@ -56,11 +57,35 @@ By default it reads Schwab settings from:
 /Users/tonyday/Trader/config/schwab.env
 ```
 
-The live universe is maintained in `config/watchlist.txt`. Strategy fields that
-Schwab quotes do not reliably provide, such as float and news catalyst, are kept
-in `config/annotations.json`.
+The active scanner uses a local listed-equity universe built from Nasdaq Trader
+symbol directories, then pulls Schwab quotes, history, and fundamentals for
+scoring. Refresh that portable universe with:
 
-Seed those files from your existing Trader watchlist:
+```bash
+python3 -m sac_scanner refresh-universe
+```
+
+This writes:
+
+```text
+data/universe/equities.json
+```
+
+The universe file is generated local data and is not committed. Run the refresh
+command on each machine during setup, including the Windows desktop.
+
+During weekdays from `4:00 AM` to `8:00 PM ET`, the scanner uses that universe
+for live Schwab scans. Outside those hours, the dashboard reads
+`config/watchlist.txt` only as a scanner-generated cache of the last active
+candidates. Manually edited or legacy watchlist files are ignored unless they
+contain the scanner cache header.
+
+The browser may poll frequently, but the local server caches scan results for a
+few minutes so the full Schwab-backed universe scan is not rerun every page
+refresh.
+
+The old Trader import command is retained for compatibility, but it is no
+longer part of the live scan path:
 
 ```bash
 python3 -m sac_scanner import-trader-watchlist
