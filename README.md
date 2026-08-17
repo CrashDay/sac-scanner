@@ -51,6 +51,8 @@ On macOS, you can also double-click `scripts/start-sac-scanner.command` from
 Finder to start the local dashboard. On Windows, run the same Python module from
 PowerShell or Command Prompt.
 
+For a fresh Windows desktop setup, see `docs/windows-setup.md`.
+
 By default it reads Schwab settings from:
 
 ```text
